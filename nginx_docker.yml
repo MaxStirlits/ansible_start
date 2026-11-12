@@ -1,0 +1,41 @@
+---
+- name: Run first container (Nginx) with Ansible
+  hosts: servers
+  become: true
+  vars:
+    container_name: nginx-demo
+    image: nginx:latest
+    host_port: 8080
+    container_port: 80
+    data_dir: /opt/nginx-data
+
+  tasks:
+    - name: Ensure data directory exists
+      ansible.builtin.file:
+        path: "{{ data_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Pull Nginx image
+      community.docker.docker_image:
+        name: "{{ image }}"
+        source: pull
+
+    - name: Run Nginx container
+      community.docker.docker_container:
+        name: "{{ container_name }}"
+        image: "{{ image }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "{{ host_port }}:{{ container_port }}"
+        volumes:
+          # Сюда можно класть свои HTML-файлы
+          - "{{ data_dir }}:/usr/share/nginx/html:ro"
+        env:
+          TZ: "UTC"
+        healthcheck:
+          test: ["CMD", "curl", "-f", "http://localhost"]
+          interval: 30s
+          timeout: 5s
+          retries: 3

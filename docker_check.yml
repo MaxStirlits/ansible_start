@@ -1,0 +1,31 @@
+---
+- name: Check container health
+  hosts: servers
+  become: false
+
+  vars:
+    container_name: nginx-demo
+    host_port: 8080
+
+  tasks:
+
+    - name: Check container is running
+      community.docker.docker_container_info:
+        name: "{{ container_name }}"
+      register: container_info
+
+    - name: Assert container is up
+      ansible.builtin.assert:
+        that:
+          - container_info.container.State.Running
+        fail_msg: "Container {{ container_name }} is NOT running"
+
+    - name: Check HTTP response is 200 OK
+      ansible.builtin.uri:
+        url: "http://localhost:{{ host_port }}/"
+        status_code: 200
+        timeout: 5
+      register: http_check
+      retries: 5
+      delay: 3
+      until: http_check.status == 200

@@ -1,0 +1,54 @@
+---
+- name: Restrict SSH allow only max/mansi and disable root login
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Check sshd_config.d directory exists
+      ansible.builtin.stat:
+        path: /etc/ssh/sshd_config.d
+      register: sshd_conf_d
+
+    - name: Create drop-in file with AllowUsers and PermitRootLogin no
+      ansible.builtin.copy:
+        content: |
+          PermitRootLogin no
+          AllowUsers max mansi
+        dest: /etc/ssh/sshd_config.d/00-allow_users.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: restart sshd
+      when: sshd_conf_d.stat.exists
+
+    - name: Fallback for older distros without sshd_config.d
+      block:
+        - name: Disable root login in sshd_config
+          ansible.builtin.lineinfile:
+            path: /etc/ssh/sshd_config
+            regexp: '^PermitRootLogin'
+            line: "PermitRootLogin no"
+            state: present
+            validate: "/usr/sbin/sshd -t -f %s"
+
+        - name: Set AllowUsers in sshd_config
+          ansible.builtin.lineinfile:
+            path: /etc/ssh/sshd_config
+            regexp: '^AllowUsers'
+            line: "AllowUsers max mansi"
+            state: present
+            validate: "/usr/sbin/sshd -t -f %s"
+      notify: restart sshd
+      when: not sshd_conf_d.stat.exists
+
+  handlers:
+    - name: Validate sshd config
+      ansible.builtin.command: "sshd -t"
+      changed_when: false
+      listen: restart sshd
+
+    - name: Restart sshd
+      ansible.builtin.service:
+        name: "{{ 'ssh' if ansible_os_family == 'Debian' else 'sshd' }}"
+        state: restarted
+      listen: restart sshd

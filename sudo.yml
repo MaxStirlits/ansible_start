@@ -1,0 +1,14 @@
+---
+- name: Add user to sudo
+  hosts: all
+  become: true
+
+  vars:
+    sudo_group: "{{ 'wheel' if ansible_os_family == 'RedHat' else 'sudo' }}"
+
+  tasks:
+    - name: Ensure mansi is in sudo group
+      ansible.builtin.user:
+        name: "mansi"
+        groups: "{{ sudo_group }}"
+        append: true

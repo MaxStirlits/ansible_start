@@ -1,0 +1,32 @@
+---
+- name: Базовая безопасность сервера
+  hosts: desktops
+  become: true
+
+  vars:
+    # Кого не выкидывать по SSH (твой пользователь)
+    ssh_allowed_users: "max"
+    # Порт SSH — можно поменять, тогда и firewall подстроится
+    ssh_port: 22
+
+  tasks:
+    # ---------- 1. Обновление пакетов ----------
+    - name: Обновить кэш apt
+      apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Обновить все пакеты до последней версии
+      apt:
+        upgrade: dist
+      register: apt_upgrade
+
+    - name: Проверить, не требуется ли перезагрузка
+      stat:
+        path: /var/run/reboot-required
+      register: reboot_required
+
+    - name: Перезагрузить, если нужно
+      reboot:
+        reboot_timeout: 600
+      when: reboot_required.stat.exists

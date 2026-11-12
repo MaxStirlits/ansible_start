@@ -1,0 +1,31 @@
+---
+- name: Security audit SSH + Fail2ban
+  hosts: all
+  become: true
+  gather_facts: true
+
+  tasks:
+    - name: Check Fail2ban service status
+      ansible.builtin.command: systemctl is-active fail2ban
+      register: f2b_status
+      failed_when: false
+      changed_when: false
+
+    - name: Get Fail2ban sshd jail status
+      ansible.builtin.shell: fail2ban-client status sshd 2>/dev/null || echo "fail2ban_not_running"
+      register: f2b_jail_status
+      changed_when: false
+
+    - name: Check SSH config PermitRootLogin and AllowUsers
+      ansible.builtin.shell: sshd -T | grep -E 'permitrootlogin|allowusers'
+      register: ssh_config_status
+      changed_when: false
+
+    - name: Report findings
+      ansible.builtin.debug:
+        msg: |
+          Host: {{ inventory_hostname }}
+          Fail2ban active: {{ f2b_status.rc == 0 }}
+          Fail2ban jail sshd: {{ f2b_jail_status.stdout }}
+          SSH config:
+            {{ ssh_config_status.stdout | replace('\n', '\n            ') }}
